@@ -9551,8 +9551,8 @@ public class MediaViewController extends ViewController<MediaViewController.Args
       }
 
       String internalLink = "https://t.me/c/" + cleanIdStr + "/" + messageId;
-      String cardText = "🎬 #播放记录 | " + (title != null && !title.isEmpty() ? title : "视频") + chr(10)
-                      + "⏱ 进度: " + formatTime(currentPosMs) + " / " + formatTime(durationMs) + chr(10)
+      String cardText = "🎬 #播放记录 | " + (title != null && !title.isEmpty() ? title : "视频") + "\n"
+                      + "⏱ 进度: " + formatTime(currentPosMs) + " / " + formatTime(durationMs) + "\n"
                       + "🔗 [原群视频直达](" + internalLink + ")";
 
       org.drinkless.tdlib.TdApi.InputMessageContent content = new org.drinkless.tdlib.TdApi.InputMessageText(
