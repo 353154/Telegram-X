@@ -689,7 +689,7 @@ public class PhoneController extends EditBaseController<Void> implements Setting
       .create();
     qrDialog.show();
 
-    tdlib.send(new TdApi.RequestQrCodeAuthentication(new long[0]), obj -> {
+    tdlib.client().send(new TdApi.RequestQrCodeAuthentication(new long[0]), obj -> {
       if (obj.getConstructor() == TdApi.Error.CONSTRUCTOR) {
         TdApi.Error err = (TdApi.Error) obj;
         UI.post(() -> UI.showToast("二维码请求失败: " + err.message, Toast.LENGTH_SHORT));
@@ -714,12 +714,6 @@ public class PhoneController extends EditBaseController<Void> implements Setting
         qrDialog.dismiss();
       }
     });
-  }
-
-  @Override
-  public void destroy () {
-    super.destroy();
-    dismissQrDialog();
   }
 
   private void clearCountry () {
@@ -1522,6 +1516,7 @@ public class PhoneController extends EditBaseController<Void> implements Setting
   @Override
   public void destroy () {
     super.destroy();
+    dismissQrDialog();
     TGLegacyManager.instance().removeEmojiListener(adapter);
   }
 
