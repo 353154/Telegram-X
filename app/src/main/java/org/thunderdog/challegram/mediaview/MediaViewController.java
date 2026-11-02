@@ -9558,7 +9558,7 @@ public class MediaViewController extends ViewController<MediaViewController.Args
       org.drinkless.tdlib.TdApi.InputMessageContent content = new org.drinkless.tdlib.TdApi.InputMessageText(
         new org.drinkless.tdlib.TdApi.FormattedText(cardText, null), null, true
       );
-      tdlib.send(new org.drinkless.tdlib.TdApi.SendMessage(tdlib.myUserId(), 0, null, null, null, content), null);
+      tdlib.send(new org.drinkless.tdlib.TdApi.SendMessage(tdlib.myUserId(), null, null, null, null, content), null);
     }
 
     private static String formatTime(long ms) {
