@@ -35,14 +35,11 @@ jobs:
         run: |
           API_ID="${SECRET_API_ID:-6}"
           API_HASH="${SECRET_API_HASH:-eb06d4abfb49dc3eeb1aeb98ae0f581e}"
-
-          cat <<EOF > local.properties
-sdk.dir=$ANDROID_HOME
-app.disable_signing=true
-telegram.api_id=$API_ID
-telegram.api_hash=$API_HASH
-tgx.extension=none
-EOF
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "app.disable_signing=true" >> local.properties
+          echo "telegram.api_id=$API_ID" >> local.properties
+          echo "telegram.api_hash=$API_HASH" >> local.properties
+          echo "tgx.extension=none" >> local.properties
           echo "Created local.properties successfully:"
           cat local.properties
 
