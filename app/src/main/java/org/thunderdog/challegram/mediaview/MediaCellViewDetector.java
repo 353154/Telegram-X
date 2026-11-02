@@ -42,6 +42,12 @@ public class MediaCellViewDetector implements FactorAnimator.Target {
     void onZoom ();
     void onClick (float x, float y);
     boolean canDoubleTap(float x, float y);
+    default boolean canCustomDoubleTap (float x, float y) {
+      return false;
+    }
+    default boolean onCustomDoubleTap (float x, float y) {
+      return false;
+    }
 
     boolean canMoveZoomedView ();
 
@@ -134,13 +140,20 @@ public class MediaCellViewDetector implements FactorAnimator.Target {
 
   private void onClick (float x, float y) {
     cancelClick();
-    if (!callback.canDoubleTap(x, y)) {
-      callback.onClick(x, y);
-      return;
-    }
     long now = SystemClock.uptimeMillis();
     if (now - lastClickTime <= DOUBLE_TAP_DELAY) {
-      performDoubleTap(x, y);
+      if (callback.onCustomDoubleTap(x, y)) {
+        lastClickTime = now;
+        return;
+      }
+      if (callback.canDoubleTap(x, y)) {
+        performDoubleTap(x, y);
+      }
+      return;
+    }
+
+    if (!callback.canDoubleTap(x, y) && !callback.canCustomDoubleTap(x, y)) {
+      callback.onClick(x, y);
       return;
     }
 

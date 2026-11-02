@@ -605,6 +605,20 @@ public class VideoPlayerView implements Player.Listener, CallManager.CurrentCall
     }
   }
 
+  public void seekBy (long deltaMs) {
+    if (player != null && player.getDuration() != C.TIME_UNSET && player.getDuration() > 0) {
+      long duration = player.getDuration();
+      long current = player.getCurrentPosition();
+      long target = Math.max(0, Math.min(duration, current + deltaMs));
+      player.seekTo(target);
+      updateTimes();
+    }
+  }
+
+  public boolean canSeek () {
+    return player != null && player.getDuration() != C.TIME_UNSET && player.getDuration() > 0;
+  }
+
   public void resumeIfNeeded (float progress) {
     if (player != null) {
       player.seekTo((long) ((double) player.getDuration() * (double) progress));

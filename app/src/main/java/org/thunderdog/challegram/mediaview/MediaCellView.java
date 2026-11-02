@@ -24,6 +24,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
+import android.os.SystemClock;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -1613,6 +1614,40 @@ public class MediaCellView extends ViewGroup implements
   @Override
   public boolean canMoveZoomedView () {
     return getParent() != null && ((MediaView) getParent()).canMoveZoomedView(this);
+  }
+
+  private long lastSeekTime;
+  private int accumulatedSeekSec;
+  private boolean lastSeekForward;
+
+  @Override
+  public boolean canCustomDoubleTap (float x, float y) {
+    return media != null && media.isVideo() && !media.isGifType() && playerView != null && playerView.canSeek();
+  }
+
+  @Override
+  public boolean onCustomDoubleTap (float x, float y) {
+    if (canCustomDoubleTap(x, y)) {
+      float width = getMeasuredWidth();
+      if (width > 0) {
+        boolean forward = x > width * 0.65f;
+        boolean backward = x < width * 0.35f;
+        if (forward || backward) {
+          long now = SystemClock.uptimeMillis();
+          if (now - lastSeekTime < 1000 && lastSeekForward == forward) {
+            accumulatedSeekSec += 10;
+          } else {
+            accumulatedSeekSec = 10;
+            lastSeekForward = forward;
+          }
+          lastSeekTime = now;
+          playerView.seekBy(forward ? 10_000 : -10_000);
+          UI.showToast((forward ? "+" : "-") + accumulatedSeekSec + "s", Toast.LENGTH_SHORT);
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Override
