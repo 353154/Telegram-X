@@ -723,9 +723,18 @@ public class U {
     } else {
       analyticsCollector = null;
     }
+    final DefaultLoadControl customLoadControl = new DefaultLoadControl.Builder()
+      .setBufferDurationsMs(
+        40_000,   // minBufferMs
+        120_000,  // maxBufferMs
+        1_500,    // bufferForPlaybackMs
+        5_000     // bufferForPlaybackAfterRebufferMs
+      )
+      .setPrioritizeTimeOverSizeThresholds(true)
+      .build();
     ExoPlayer.Builder b = new ExoPlayer.Builder(context, renderersFactory, mediaSourceFactory)
       .setTrackSelector(new DefaultTrackSelector(context))
-      .setLoadControl(new DefaultLoadControl());
+      .setLoadControl(customLoadControl);
     if (analyticsCollector != null) {
       b.setAnalyticsCollector(analyticsCollector);
     }
