@@ -24,29 +24,35 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Set up Android SDK & NDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | sdkmanager --licenses || true
 
-      - name: Prepare local.properties with Hardcoded Telegram Credentials
+      - name: Prepare local.properties with Telegram Credentials
         env:
           SECRET_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           SECRET_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: |
-          # 优先使用 Secrets，没有则自动使用内置硬编码凭据
           API_ID="${SECRET_API_ID:-6}"
           API_HASH="${SECRET_API_HASH:-eb06d4abfb49dc3eeb1aeb98ae0f581e}"
 
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
-          echo "telegram.api_id=$API_ID" >> local.properties
-          echo "telegram.api_hash=$API_HASH" >> local.properties
-          echo "Created local.properties with API_ID=$API_ID successfully."
+          cat <<EOF > local.properties
+sdk.dir=$ANDROID_HOME
+app.disable_signing=true
+telegram.api_id=$API_ID
+telegram.api_hash=$API_HASH
+tgx.extension=none
+EOF
+          echo "Created local.properties successfully:"
+          cat local.properties
 
-      - name: Grant Execute Permission for Gradle & Setup Scripts
+      - name: Setup Scripts and Dependencies
         run: |
           chmod +x gradlew
-          if [ -f "scripts/setup.sh" ]; then
-            chmod +x scripts/setup.sh
-            ./scripts/setup.sh || true
+          if [ -d "scripts" ]; then
+            chmod +x scripts/*.sh
+            export ANDROID_SDK_ROOT=$ANDROID_HOME
+            ./scripts/setup.sh --default-sdk-root || true
           fi
 
       - name: Build Universal Debug APK
@@ -56,5 +62,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Telegram-X-Universal-Debug-APK
-          path: app/build/outputs/apk/universal/debug/*.apk
+          path: app/build/outputs/apk/**/*.apk
           retention-days: 14
