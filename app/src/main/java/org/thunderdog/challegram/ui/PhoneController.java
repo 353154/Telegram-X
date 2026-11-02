@@ -16,6 +16,8 @@ package org.thunderdog.challegram.ui;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.text.InputFilter;
@@ -28,9 +30,16 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.MultiFormatWriter;
+import com.google.zxing.common.BitMatrix;
+import java.util.EnumMap;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -219,6 +228,8 @@ public class PhoneController extends EditBaseController<Void> implements Setting
   private MaterialEditTextGroup countryView, codeView, numberView;
   private ListItem hintItem;
   private ListItem firstNameItem, lastNameItem;
+  private AlertDialog qrDialog;
+  private ImageView qrImageView;
 
   private boolean oneShotFocusSet;
 
@@ -360,8 +371,11 @@ public class PhoneController extends EditBaseController<Void> implements Setting
 
     contentView.addView(countryWrap);
 
-    this.baseItems = new ArrayList<>(3);
+    this.baseItems = new ArrayList<>(4);
     this.baseItems.add(new ListItem(ListItem.TYPE_CUSTOM_SINGLE));
+    if (mode == MODE_LOGIN) {
+      this.baseItems.add(new ListItem(ListItem.TYPE_SETTING, R.id.btn_qrLogin, R.drawable.xt3000_baseline_qrcode_scan_24, "📷 使用二维码扫码登录 (QR Code Login)", false).setTextColorId(ColorId.textNeutral));
+    }
     if (mode == MODE_ADD_CONTACT) {
       this.baseItems.add(firstNameItem = new ListItem(ListItem.TYPE_EDITTEXT_NO_PADDING_REUSABLE, R.id.edit_first_name, 0, R.string.login_FirstName).setStringValue(initialFirstName));
       this.baseItems.add(lastNameItem = new ListItem(ListItem.TYPE_EDITTEXT_NO_PADDING_REUSABLE, R.id.edit_last_name, 0, R.string.login_LastName).setStringValue(initialLastName));
@@ -598,6 +612,8 @@ public class PhoneController extends EditBaseController<Void> implements Setting
     final int viewId = v.getId();
     if (viewId == R.id.btn_syncContacts) {
       adapter.toggleView(v);
+    } else if (viewId == R.id.btn_qrLogin) {
+      onQrLoginClicked();
     } else if (viewId == R.id.result) {
       ListItem item = (ListItem) v.getTag();
       if (item != null && item.getData() instanceof TdApi.CountryInfo country) {
@@ -605,6 +621,105 @@ public class PhoneController extends EditBaseController<Void> implements Setting
         setCountry(country, true, true);
       }
     }
+  }
+
+  private static Bitmap generateQrBitmap (String text, int sizePx) {
+    if (text == null || text.isEmpty() || sizePx <= 0) return null;
+    try {
+      Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
+      hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+      hints.put(EncodeHintType.MARGIN, 1);
+      BitMatrix matrix = new MultiFormatWriter().encode(
+        text, BarcodeFormat.QR_CODE, sizePx, sizePx, hints
+      );
+      int w = matrix.getWidth();
+      int h = matrix.getHeight();
+      int[] pixels = new int[w * h];
+      for (int y = 0; y < h; y++) {
+        int offset = y * w;
+        for (int x = 0; x < w; x++) {
+          pixels[offset + x] = matrix.get(x, y) ? Color.BLACK : Color.WHITE;
+        }
+      }
+      Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+      bmp.setPixels(pixels, 0, w, 0, 0, w, h);
+      return bmp;
+    } catch (Throwable t) {
+      return null;
+    }
+  }
+
+  private void onQrLoginClicked () {
+    Keyboard.hideList(numberView != null ? numberView.getEditText() : null, codeView != null ? codeView.getEditText() : null, countryView != null ? countryView.getEditText() : null);
+
+    LinearLayout container = new LinearLayout(context);
+    container.setOrientation(LinearLayout.VERTICAL);
+    container.setGravity(Gravity.CENTER_HORIZONTAL);
+    int pad = Screen.dp(24);
+    container.setPadding(pad, pad, pad, pad);
+    container.setBackgroundColor(Theme.fillingColor());
+
+    TextView title = new TextView(context);
+    title.setText("扫码登录 Telegram X");
+    title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
+    title.setTextColor(Theme.textAccentColor());
+    title.setGravity(Gravity.CENTER);
+    container.addView(title);
+
+    qrImageView = new ImageView(context);
+    int qrSize = Screen.dp(220);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(qrSize, qrSize);
+    params.topMargin = Screen.dp(16);
+    params.bottomMargin = Screen.dp(16);
+    qrImageView.setBackgroundColor(Color.WHITE);
+    container.addView(qrImageView, params);
+
+    TextView hint = new TextView(context);
+    hint.setText("1. 打开已登录手机上的 Telegram\n2. 进入 设置 > 设备 > 扫描二维码\n3. 扫描上方二维码确认登录");
+    hint.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+    hint.setTextColor(Theme.textDecentColor());
+    container.addView(hint);
+
+    if (qrDialog != null && qrDialog.isShowing()) {
+      qrDialog.dismiss();
+    }
+    qrDialog = new AlertDialog.Builder(context)
+      .setView(container)
+      .setNegativeButton("取消", (d, w) -> d.dismiss())
+      .create();
+    qrDialog.show();
+
+    tdlib.send(new TdApi.RequestQrCodeAuthentication(new long[0]), obj -> {
+      if (obj.getConstructor() == TdApi.Error.CONSTRUCTOR) {
+        TdApi.Error err = (TdApi.Error) obj;
+        UI.post(() -> UI.showToast("二维码请求失败: " + err.message, Toast.LENGTH_SHORT));
+      } else if (obj.getConstructor() == TdApi.AuthorizationStateWaitOtherDeviceConfirmation.CONSTRUCTOR) {
+        updateQrCode(((TdApi.AuthorizationStateWaitOtherDeviceConfirmation) obj).link);
+      }
+    });
+  }
+
+  public void updateQrCode (String link) {
+    Bitmap bmp = generateQrBitmap(link, Screen.dp(220));
+    UI.post(() -> {
+      if (qrImageView != null && bmp != null) {
+        qrImageView.setImageBitmap(bmp);
+      }
+    });
+  }
+
+  public void dismissQrDialog () {
+    UI.post(() -> {
+      if (qrDialog != null && qrDialog.isShowing()) {
+        qrDialog.dismiss();
+      }
+    });
+  }
+
+  @Override
+  public void destroy () {
+    super.destroy();
+    dismissQrDialog();
   }
 
   private void clearCountry () {

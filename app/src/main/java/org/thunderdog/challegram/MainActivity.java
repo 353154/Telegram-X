@@ -366,6 +366,18 @@ public class MainActivity extends BaseActivity implements GlobalAccountListener,
       return;
     }
 
+    if (authorizationState != null && authorizationState.getConstructor() == TdApi.AuthorizationStateWaitOtherDeviceConfirmation.CONSTRUCTOR) {
+      if (current instanceof PhoneController) {
+        ((PhoneController) current).updateQrCode(((TdApi.AuthorizationStateWaitOtherDeviceConfirmation) authorizationState).link);
+      }
+      return;
+    }
+    if (status == Tdlib.Status.READY || (authorizationState != null && (authorizationState.getConstructor() == TdApi.AuthorizationStateWaitPassword.CONSTRUCTOR || authorizationState.getConstructor() == TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR))) {
+      if (current instanceof PhoneController) {
+        ((PhoneController) current).dismissQrDialog();
+      }
+    }
+
     if (status == Tdlib.Status.READY) {
       ViewController<?> first = navigation.getStack().get(0);
       boolean needThemeSwitch = this.account.id != account.id && isUnauthorizedController(current) && !isUnauthorizedController(first) && first.tdlibId() != account.id && current.tdlibId() == account.id;
