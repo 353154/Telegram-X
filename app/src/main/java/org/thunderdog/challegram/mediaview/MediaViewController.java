@@ -1968,8 +1968,10 @@ public class MediaViewController extends ViewController<MediaViewController.Args
       boolean isVisible = headerVisible.toggleValue(true);
       if (isVisible) {
         context().removeHideNavigationView(this);
+        setLowProfile(false);
       } else {
         context().addHideNavigationView(this);
+        setLowProfile(true);
       }
       return true;
     }

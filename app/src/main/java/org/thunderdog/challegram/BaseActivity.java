@@ -879,7 +879,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
 
   public void setWindowDecorSystemUiVisibility (int visibility, boolean remember) {
     boolean lightNavigationBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Config.USE_CUSTOM_NAVIGATION_COLOR && !Theme.isDark() && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0;
-    boolean lightStatusBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Theme.needLightStatusBar();
+    boolean lightStatusBar = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && (isFullscreen ? false : Theme.needLightStatusBar());
     UI.setLightSystemBars(getWindow(), lightNavigationBar, lightStatusBar, visibility, true);
     if (this.isWindowLight != lightNavigationBar) {
       this.isWindowLight = lightNavigationBar;
@@ -937,13 +937,27 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
 
   private boolean isFullscreen, cutoutIgnored;
 
+  private void updateFullscreenWindowFlags () {
+    boolean hide = isFullscreen && hideNavigation;
+    setWindowFlags(hide ? WindowManager.LayoutParams.FLAG_FULLSCREEN : 0, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      android.view.WindowInsetsController insetsController = getWindow().getInsetsController();
+      if (insetsController != null) {
+        if (hide) {
+          insetsController.hide(android.view.WindowInsets.Type.statusBars());
+        } else {
+          insetsController.show(android.view.WindowInsets.Type.statusBars());
+        }
+      }
+    }
+  }
+
   private int computeUiVisibility () {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && isFullscreen) {
-      int uiVisibility = View.SYSTEM_UI_FLAG_LOW_PROFILE;
       if (hideNavigation) {
-        uiVisibility |= View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+        return View.SYSTEM_UI_FLAG_LOW_PROFILE | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
       }
-      return uiVisibility;
+      return View.SYSTEM_UI_FLAG_VISIBLE;
     }
     return View.SYSTEM_UI_FLAG_VISIBLE;
   }
@@ -968,7 +982,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
           params.layoutInDisplayCutoutMode = isFullscreen ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
           w.setAttributes(params);
         }
-        setWindowFlags(isFullscreen ? WindowManager.LayoutParams.FLAG_FULLSCREEN : 0, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        updateFullscreenWindowFlags();
         int uiVisibility = computeUiVisibility();
         setWindowDecorSystemUiVisibility(uiVisibility, true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && !isFullscreen && (Config.CUTOUT_ENABLED || cutoutIgnored)) {
@@ -1002,6 +1016,7 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
       if (this.hideNavigation != hideNavigation) {
         this.hideNavigation = hideNavigation;
+        updateFullscreenWindowFlags();
         setWindowDecorSystemUiVisibility(computeUiVisibility(), true);
       }
     }
