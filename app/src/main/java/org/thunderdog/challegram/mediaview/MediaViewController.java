@@ -9446,4 +9446,125 @@ public class MediaViewController extends ViewController<MediaViewController.Args
 
     return null;
   }
+
+  /* * =========================================================
+   * Injected Video Optimization & History Sync Helpers
+   * ========================================================= */
+  public void togglePlayerControls () {
+    toggleHeaderVisibility();
+  }
+
+  private void startStreamingVideo (int fileId) {
+    if (fileId != 0 && tdlib != null) {
+      tdlib.send(new org.drinkless.tdlib.TdApi.DownloadFile(fileId, 32, 0, 0, false), null);
+    }
+  }
+
+  public void onMediaDismissed (int activeFileId, androidx.media3.common.Player player) {
+    if (player != null) {
+      player.stop();
+      player.clearMediaItems();
+    }
+    if (activeFileId != 0 && tdlib != null) {
+      tdlib.send(new org.drinkless.tdlib.TdApi.CancelDownloadFile(activeFileId, false), null);
+    }
+  }
+
+  public static class VideoGestureSeekHelper {
+    private final android.view.GestureDetector gestureDetector;
+    private final Runnable hideHudRunnable;
+    private long accumulatedSeekMs = 0;
+    private boolean isForward = false;
+
+    public VideoGestureSeekHelper(android.content.Context context, androidx.media3.common.Player player, android.view.View leftHud, android.view.View rightHud, android.widget.TextView hudText, Runnable onSingleTapAction) {
+      this.hideHudRunnable = () -> {
+        if (leftHud != null) leftHud.animate().alpha(0f).setDuration(200).start();
+        if (rightHud != null) rightHud.animate().alpha(0f).setDuration(200).start();
+        accumulatedSeekMs = 0;
+      };
+
+      this.gestureDetector = new android.view.GestureDetector(context, new android.view.GestureDetector.SimpleOnGestureListener() {
+        @Override
+        public boolean onSingleTapConfirmed(android.view.MotionEvent e) {
+          if (onSingleTapAction != null) {
+            onSingleTapAction.run();
+          }
+          return true;
+        }
+
+        @Override
+        public boolean onDoubleTap(android.view.MotionEvent e) {
+          int width = context.getResources().getDisplayMetrics().widthPixels;
+          float x = e.getX();
+
+          if (x < width * 0.35f) {
+            performSeek(player, false, leftHud, hudText);
+            return true;
+          } else if (x > width * 0.65f) {
+            performSeek(player, true, rightHud, hudText);
+            return true;
+          }
+          return false;
+        }
+      });
+    }
+
+    private void performSeek(androidx.media3.common.Player player, boolean forward, android.view.View activeHud, android.widget.TextView hudText) {
+      if (player == null) return;
+
+      if (this.isForward != forward) {
+        this.accumulatedSeekMs = 0;
+        this.isForward = forward;
+      }
+
+      this.accumulatedSeekMs += 10000;
+      long duration = player.getDuration();
+      long current = player.getCurrentPosition();
+      long target = forward ? Math.min(duration, current + 10000) : Math.max(0, current - 10000);
+      player.seekTo(target);
+
+      if (hudText != null) {
+        hudText.setText((forward ? "+" : "-") + (accumulatedSeekMs / 1000) + "s");
+      }
+      if (activeHud != null) {
+        activeHud.removeCallbacks(hideHudRunnable);
+        activeHud.setAlpha(1f);
+        activeHud.setVisibility(android.view.View.VISIBLE);
+        activeHud.postDelayed(hideHudRunnable, 650);
+      }
+    }
+
+    public boolean onTouchEvent(android.view.MotionEvent event) {
+      return gestureDetector.onTouchEvent(event);
+    }
+  }
+
+  public static class VideoHistorySyncManager {
+    public static void syncProgressToCloud(org.thunderdog.challegram.telegram.Tdlib tdlib, long chatId, long messageId, String title, long currentPosMs, long durationMs) {
+      if (tdlib == null || durationMs <= 0 || currentPosMs < 5000) return;
+
+      String cleanIdStr = String.valueOf(chatId);
+      if (cleanIdStr.startsWith("-100")) {
+        cleanIdStr = cleanIdStr.substring(4);
+      } else if (cleanIdStr.startsWith("-")) {
+        cleanIdStr = cleanIdStr.substring(1);
+      }
+
+      String internalLink = "https://t.me/c/" + cleanIdStr + "/" + messageId;
+      String cardText = "🎬 #播放记录 | " + (title != null && !title.isEmpty() ? title : "视频") + chr(10)
+                      + "⏱ 进度: " + formatTime(currentPosMs) + " / " + formatTime(durationMs) + chr(10)
+                      + "🔗 [原群视频直达](" + internalLink + ")";
+
+      org.drinkless.tdlib.TdApi.InputMessageContent content = new org.drinkless.tdlib.TdApi.InputMessageText(
+        new org.drinkless.tdlib.TdApi.FormattedText(cardText, null), null, true
+      );
+      tdlib.send(new org.drinkless.tdlib.TdApi.SendMessage(tdlib.myUserId(), 0, null, null, null, content), null);
+    }
+
+    private static String formatTime(long ms) {
+      long s = ms / 1000;
+      return String.format(java.util.Locale.US, "%02d:%02d", (s % 3600) / 60, s % 60);
+    }
+  }
+
 }
